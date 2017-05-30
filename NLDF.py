@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
     sess = tf.Session()
 
-    model = DAC()
+    model = Model()
     model.build_model()
 
     #train_op = tf.train.AdamOptimizer(0.0001)
