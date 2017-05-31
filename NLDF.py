@@ -13,8 +13,6 @@ class Model:
 
         self.input_holder = tf.placeholder(tf.float32, [1, img_size, img_size, 3])
         self.label_holder = tf.placeholder(tf.float32, [label_size*label_size, 2])
-        self.keep_prob = tf.placeholder(tf.float32)
-        self.weights = np.array([0.8, 0.2])
 
         self.sobel_fx, self.sobel_fy = self.sobel_filter()
 
@@ -188,7 +186,7 @@ if __name__ == "__main__":
     max_grad_norm = 1
     tvars = tf.trainable_variables()
     grads, _ = tf.clip_by_global_norm(tf.gradients(model.C_IoU_LOSS, tvars), max_grad_norm)
-    opt = tf.train.AdamOptimizer(1e-6)
+    opt = tf.train.AdamOptimizer(1e-5)
     optimizer = opt.apply_gradients(zip(grads, tvars))
 
     sess.run(tf.global_variables_initializer())
@@ -196,15 +194,13 @@ if __name__ == "__main__":
     for i in xrange(200):
         _, C_IoU_LOSS = sess.run([optimizer, model.C_IoU_LOSS],
                                  feed_dict={model.input_holder: img,
-                                            model.label_holder: label,
-                                            model.keep_prob: 0.5})
+                                            model.label_holder: label})
 
         print('[Iter %d] Contour Loss: %f' % (i, C_IoU_LOSS))
 
     boundary, gt_boundary = sess.run([model.Prob_Grad, model.label_Grad],
                                      feed_dict={model.input_holder: img,
-                                                model.label_holder: label,
-                                                model.keep_prob: 1})
+                                                model.label_holder: label})
 
     boundary = np.squeeze(boundary)
     boundary = cv2.resize(boundary, (w, h))
