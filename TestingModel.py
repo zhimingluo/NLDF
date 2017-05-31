@@ -1,150 +1,87 @@
 import cv2
 import numpy as np
-import NLDF as Model
-import os, sys
+import NLDF
+import os
+import sys
 import tensorflow as tf
 import time
 import vgg16
 
-def load_training_list():
-    with open('dataset/MSRA-B/train_cvpr2013.txt') as f:
-        lines = f.read().splitlines()
 
-    files = []
-    labels = []
+def load_img_list(dataset):
 
-    for line in lines:
-        labels.append('dataset/MSRA-B/annotation/%s' % line)
-        files.append('dataset/MSRA-B/image/%s' % line.replace('.png', '.jpg'))
+    if dataset == 'MSRA-B':
+        path = 'dataset/MSRA-B/image'
+    elif dataset == 'HKU-IS':
+        path = 'dataset/HKU-IS/imgs'
+    elif dataset == 'DUT-OMRON':
+        path = 'dataset/DUT-OMRON/DUT-OMRON-image'
+    elif dataset == 'PASCAL-S':
+        path = 'dataset/PASCAL-S/pascal'
+    elif dataset == 'SOD':
+        path = 'dataset/BSDS300/imgs'
+    elif dataset == 'ECSSD':
+        path = 'dataset/ECSSD/images'
 
-    return files, labels
+    imgs = os.listdir(path)
 
-def load_val_list():
-    with open('dataset/MSRA-B/valid_cvpr2013.txt') as f:
-        lines = f.read().splitlines()
-
-    files = []
-    labels = []
-
-    for line in lines:
-        labels.append('dataset/MSRA-B/annotation/%s' % line)
-        files.append('dataset/MSRA-B/image/%s' % line.replace('.png', '.jpg'))
-
-    return files, labels
-
-def load_test_list():
-    with open('dataset/MSRA-B/test_cvpr2013.txt') as f:
-        lines = f.read().splitlines()
-
-    files = []
-    labels = []
-
-    for line in lines:
-        labels.append('dataset/MSRA-B/annotation/%s' % line)
-        files.append('dataset/MSRA-B/image/%s' % line.replace('.png', '.jpg'))
-
-    return files, labels
-
-
-def Pascal_list():
-
-    files = []
-    labels = []
-
-    for i in xrange(850):
-        filename = 'dataset/Pascal-S/pascal/%d.jpg' % (i+1)
-        files.append(filename)
-
-        labelname = 'dataset/Pascal-S/mask/%d.png' % (i+1)
-        labels.append(labelname)
-
-    return files, labels
-
-def HKUIS_list():
-
-    files = []
-    labels = []
-
-    imgs = os.listdir('dataset/HKU-IS/imgs/')
-
-    for img in imgs:
-        filename = 'dataset/HKU-IS/imgs/%s' % (img)
-        files.append(filename)
-
-        label = img.replace('.jpg', '.png')
-        labelname = 'dataset/HKU-IS/gt/%s' % (label)
-        labels.append(labelname)
-
-    return files, labels
-
-def DUT_OMRON_list():
-
-    files = []
-    labels = []
-
-    imgs = os.listdir('dataset/DUT-OMRON/DUT-OMRON-image/')
-
-    for img in imgs:
-        filename = 'dataset/DUT-OMRON/DUT-OMRON-image/%s' % (img)
-        files.append(filename)
-
-        label = img.replace('.jpg', '.png')
-        labelname = 'dataset/DUT-OMRON/pixelwiseGT-new-PNG/%s' % (label)
-        labels.append(labelname)
-
-    return files, labels
+    return path, imgs
 
 
 if __name__ == "__main__":
 
-    model = Model.DAC()
+    model = NLDF.Model()
     model.build_model()
 
-
     sess = tf.Session()
-    sess.run(tf.initialize_all_variables())
-    img_size = Model.img_size
-    label_size = Model.label_size
+    sess.run(tf.global_variables_initializer())
+    img_size = NLDF.img_size
+    label_size = NLDF.label_size
 
     ckpt = tf.train.get_checkpoint_state('Model/')
     saver = tf.train.Saver()
     saver.restore(sess, ckpt.model_checkpoint_path)
 
+    datasets = ['MSRA-B', 'HKU-IS', 'DUT-OMRON',
+                'PASCAL-S', 'ECSSD', 'SOD']
 
-    train_list, label_list = load_test_list()
-    #train_list, label_list = Pascal_list()
-    #train_list, label_list = HKUIS_list()
-    #train_list, label_list = DUT_OMRON_list()
+    if not os.path.exists('Result'):
+        os.mkdir('Result')
 
+    for dataset in datasets:
+        path, imgs = load_img_list(dataset)
 
-    for f_img in train_list:
-        #print f_img
+        save_dir = 'Result/' + dataset
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
 
+        save_dir = 'Result/' + dataset + '/NLDF'
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
 
-        img = cv2.imread(f_img)
-        ori_img = img.copy()
-        img_shape= img.shape
-        img = cv2.resize(img,(img_size,img_size)) - vgg16.VGG_MEAN
-        img = img.reshape((1, img_size, img_size, 3))
+        for f_img in imgs:
 
-        start_time = time.time()
-        result = sess.run(model.Prob,
-                          feed_dict={model.input_holder: img,
-                                     model.keep_prob: 1})
-        print("--- %s seconds ---" % (time.time() - start_time))
+            img = cv2.imread(os.path.join(path, f_img))
+            img_name, ext = os.path.splitext(f_img)
 
-        result = np.reshape(result, (label_size, label_size,2))
-        result = result[:,:,0]
+            if img is not None:
+                ori_img = img.copy()
+                img_shape = img.shape
+                img = cv2.resize(img, (img_size, img_size)) - vgg16.VGG_MEAN
+                img = img.reshape((1, img_size, img_size, 3))
 
-        result = cv2.resize(np.squeeze(result),(img_shape[1],img_shape[0]))
+                start_time = time.time()
+                result = sess.run(model.Prob,
+                                  feed_dict={model.input_holder: img,
+                                             model.keep_prob: 1})
+                print("--- %s seconds ---" % (time.time() - start_time))
 
+                result = np.reshape(result, (label_size, label_size, 2))
+                result = result[:, :, 0]
 
-        res = f_img.replace("/image/", "/result/NLDF/")    #MSRA-B
-        #res = f_img.replace("/pascal/", "/V13_v2_C_v2/")   #Pascal
-        #res = f_img.replace("/imgs/", "/V13_v2_C_v2/")      #HKUIS
-        #res = f_img.replace("/DUT-OMRON-image/", "/V13_v2_C_v2/")  # DUT-OMRON
+                result = cv2.resize(np.squeeze(result), (img_shape[1], img_shape[0]))
 
-        res = res.replace(".jpg", ".png")
-        cv2.imwrite(res, (result*255).astype(np.uint8))
+                save_name = os.path.join(save_dir, img_name+'_NLDF.png')
+                cv2.imwrite(save_name, (result*255).astype(np.uint8))
 
     sess.close()
