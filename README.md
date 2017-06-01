@@ -1,4 +1,4 @@
-# NLDF
+# Non-Local Deep Features for Salient Object Detection
 This repository contains the code of the paper: 
 
 Luo Z, Mishra A, Achkar A, Eichel J, Li S-Z, Jodoin P-M, 
